@@ -39,12 +39,22 @@ function saveSchedules(arr) {
 function loadBosses() {
     if (!fs.existsSync(BOSSES_FILE)) return [];
     try {
-        return JSON.parse(fs.readFileSync(BOSSES_FILE, 'utf8'));
+        const raw = JSON.parse(fs.readFileSync(BOSSES_FILE, 'utf8'));
+        // normaliza cada boss para ter campos previsíveis
+        return raw.map(b => ({
+            // tenta vários nomes de campo possíveis
+            key: (b.nome || b.name || b.key || '').toLowerCase(),
+            titulo: b.titulo || b.title || b.nome || b.name || null,
+            imagem: b.imagem || b.image || b.img || b.picture || null,
+            id: b.id || null,
+            raw: b
+        }));
     } catch (e) {
         console.error('Erro ao ler bosses.json:', e);
         return [];
     }
 }
+
 
 function timeToCronExpression(time) {
     const [hh, mm] = time.split(':').map(Number);
@@ -293,4 +303,5 @@ if (content === '!limpar') {
 client.login(process.env.DISCORD_TOKEN).catch(e => {
     console.error('Erro ao logar cliente Discord:', e);
 });
+
 
