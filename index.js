@@ -29,12 +29,27 @@ function loadSchedules() {
 }
 
 function saveSchedules(arr) {
-    fs.writeFileSync(SCHEDULE_FILE, JSON.stringify(arr, null, 2), 'utf8');
+    try {
+        fs.writeFileSync(SCHEDULE_FILE, JSON.stringify(arr, null, 2), 'utf8');
+    } catch (e) {
+        console.error('Erro ao salvar schedules.json:', e);
+    }
+}
+
+function loadBosses() {
+    if (!fs.existsSync(BOSSES_FILE)) return [];
+    try {
+        return JSON.parse(fs.readFileSync(BOSSES_FILE, 'utf8'));
+    } catch (e) {
+        console.error('Erro ao ler bosses.json:', e);
+        return [];
+    }
 }
 
 function timeToCronExpression(time) {
     const [hh, mm] = time.split(':').map(Number);
     if (isNaN(hh) || isNaN(mm)) return null;
+    // node-cron uses: second minute hour day month weekday
     return `0 ${mm} ${hh} * * *`;
 }
 
@@ -59,7 +74,7 @@ function scheduleAll(client) {
                 try {
                     const channel = await client.channels.fetch(s.channelId).catch(() => null);
                     if (!channel) return;
-                    const roleMention = `<@&${s.roleId}>`;
+                    const roleMention = s.roleId ? `<@&${s.roleId}>` : '';
 
                     console.log(`[CRON] Disparando ${s.time} -> ${s.message}`);
 
@@ -109,153 +124,154 @@ client.once('ready', () => {
 });
 
 client.on('messageCreate', async message => {
-    if (message.author.bot || !message.guild) return;
+    try {
+        if (message.author.bot || !message.guild) return;
 
-    const isAdmin =
-        message.member.permissions.has('Administrator') ||
-        message.member.permissions.has('ManageGuild');
-    if (!isAdmin) return;
+        const isAdmin =
+            (message.member && (message.member.permissions.has('Administrator') || message.member.permissions.has('ManageGuild')));
+        if (!isAdmin) return;
 
-    const content = message.content.trim();
+        const content = message.content.trim();
 
-    // ---- !agenda HH:MM #canal @role nome_do_boss [mensagem opcional]
-    if (content.startsWith('!agenda ')) {
-        const parts = content.split(' ');
-        const time = parts[1];
-        const channelMention = (message.mentions.channels.first() || {}).id || parts[2];
-        const roleMention = (message.mentions.roles.first() || {}).id || parts[3];
-        const bossKey = parts[4] ? parts[4].toLowerCase() : null;
-        const extraText = parts.slice(5).join(' ');
+        // ---- !agenda HH:MM #canal @role nome_do_boss [mensagem opcional]
+        if (content.startsWith('!agenda ')) {
+            const parts = content.split(' ');
+            const time = parts[1];
+            const channelMention = (message.mentions.channels.first() || {}).id || parts[2];
+            const roleMention = (message.mentions.roles.first() || {}).id || parts[3];
+            const bossKey = parts[4] ? parts[4].toLowerCase() : null;
+            const extraText = parts.slice(5).join(' ');
 
-        if (!time || !channelMention || !roleMention || !bossKey) {
-            message.reply('Uso: `!add HH:MM #canal @role nome_do_boss [mensagem opcional]`');
-            return;
-        }
-        if (!/^\d{2}:\d{2}$/.test(time)) {
-            message.reply('Hora inválida. Use HH:MM');
-            return;
-        }
-
-        // tenta carregar boss
-        let bosses = [];
-        if (fs.existsSync(BOSSES_FILE)) {
-            try {
-                bosses = JSON.parse(fs.readFileSync(BOSSES_FILE, 'utf8'));
-            } catch (e) {
-                bosses = [];
-            }
-        }
-        const boss = bosses.find(b => b.nome.toLowerCase() === bossKey);
-
-        let msgText;
-        let imageUrl = null;
-
-        if (boss) {
-            msgText = `${extraText ? extraText + '\n' : ''}A preparação para o boss **${boss.titulo}** vai terminar em 10 minutos!`;
-            imageUrl = boss.imagem;
-        } else {
-            msgText = extraText || `Mensagem agendada (${bossKey})`;
-        }
-
-        const schedules = loadSchedules();
-        const id = Date.now().toString();
-        schedules.push({
-            id,
-            time,
-            channelId: channelMention,
-            roleId: roleMention,
-            message: msgText,
-            image: imageUrl
-        });
-        saveSchedules(schedules);
-        scheduleAll(client);
-        message.reply(`Agenda criada: ${time} -> <#${channelMention}> <@&${roleMention}> (id: ${id})`);
-        return;
-    }
-
-    // ---- !listaschedules
-    if (content === '!lista') {
-        const schedules = loadSchedules();
-        if (!schedules.length) {
-            message.reply('Nenhuma agenda cadastrada.');
-            return;
-        }
-        const lines = schedules.map(
-            s => `ID:${s.id} - ${s.time} - <#${s.channelId}> - <@&${s.roleId}>`
-        );
-        for (let i = 0; i < lines.length; i += 10) {
-            await message.channel.send(lines.slice(i, i + 10).join('\n'));
-        }
-        return;
-    }
-
-    // ---- !removeschedule ID
-    if (content.startsWith('!remover ')) {
-        const id = content.split(' ')[1];
-        if (!id) {
-            message.reply('Coloque o ID: `!removeschedule ID`');
-            return;
-        }
-        let schedules = loadSchedules();
-        const before = schedules.length;
-        schedules = schedules.filter(s => s.id !== id);
-        if (schedules.length === before) {
-            message.reply('ID não encontrado.');
-            return;
-        }
-        saveSchedules(schedules);
-        scheduleAll(client);
-        message.reply('Agenda removida: ' + id);
-        return;
-    }
-
-    // ---- !run ID (força envio)
-    if (content.startsWith('!run ')) {
-        const id = content.split(' ')[1];
-        if (!id) {
-            message.reply('Uso: !testar ID');
-            return;
-        }
-        const schedules = loadSchedules();
-        const s = schedules.find(x => x.id === id);
-        if (!s) {
-            message.reply('ID não encontrado');
-            return;
-        }
-        try {
-            const channel = await client.channels.fetch(s.channelId).catch(() => null);
-            if (!channel) {
-                message.reply('Canal não encontrado');
+            if (!time || !channelMention || !roleMention || !bossKey) {
+                message.reply('Uso: `!agenda HH:MM #canal @role nome_do_boss [mensagem opcional]`');
                 return;
             }
-            const roleMention = `<@&${s.roleId}>`;
-            if (s.image) {
-                const embed = new EmbedBuilder()
-                    .setColor(0x00aeff)
-                    .setTitle('⚔️ Boss Spawn Imminente!')
-                    .setDescription(s.message)
-                    .setImage(s.image)
-                    .setTimestamp();
-                await channel.send({ content: roleMention, embeds: [embed] });
-            } else {
-                await channel.send(`${roleMention} ${s.message}`);
+            if (!/^\d{2}:\d{2}$/.test(time)) {
+                message.reply('Hora inválida. Use HH:MM');
+                return;
             }
-            message.reply('Mensagem enviada.');
-        } catch (err) {
-            console.error(err);
-            message.reply('Erro ao enviar, veja logs.');
-        }
-        return;
-    }
 
-    // ---- !debugschedules
-    if (content === '!debug') {
-        const schedules = loadSchedules();
-        message.reply(`TIMEZONE=${TIMEZONE}\nSchedules carregados: ${schedules.length}`);
-        console.log('Schedules:', schedules);
-        return;
+            // tenta carregar boss
+            let bosses = loadBosses();
+            const boss = bosses.find(b => (b.nome || '').toLowerCase() === bossKey);
+
+            let msgText;
+            let imageUrl = null;
+
+            if (boss) {
+                msgText = `${extraText ? extraText + '\n' : ''}A preparação para o boss **${boss.titulo}** vai terminar em 10 minutos!`;
+                imageUrl = boss.imagem || null;
+            } else {
+                msgText = extraText || `Mensagem agendada (${bossKey})`;
+            }
+
+            const schedules = loadSchedules();
+            const id = Date.now().toString();
+            schedules.push({
+                id,
+                time,
+                channelId: channelMention,
+                roleId: roleMention,
+                boss: boss ? boss.titulo : bossKey, // salva o boss escolhido
+                message: msgText,
+                image: imageUrl
+            });
+            saveSchedules(schedules);
+            scheduleAll(client);
+            message.reply(`Agenda criada: ${time} -> <#${channelMention}> <@&${roleMention}> (id: ${id})`);
+            return;
+        }
+
+        // ---- !lista
+        if (content === '!lista') {
+            const schedules = loadSchedules();
+            if (!schedules.length) {
+                message.reply('Nenhuma agenda cadastrada.');
+                return;
+            }
+            const lines = schedules.map(s => {
+                const bossText = s.boss ? `Boss: ${s.boss}` : 'Boss: (não informado)';
+                const msgText = s.message ? `Mensagem: ${s.message}` : 'Mensagem: (vazia)';
+                return `ID:${s.id} - ${s.time} - ${bossText} - ${msgText} - Canal: <#${s.channelId}> - Role: <@&${s.roleId}>`;
+            });
+            for (let i = 0; i < lines.length; i += 10) {
+                await message.channel.send(lines.slice(i, i + 10).join('\n'));
+            }
+            return;
+        }
+
+        // ---- !remover ID
+        if (content.startsWith('!remover ')) {
+            const id = content.split(' ')[1];
+            if (!id) {
+                message.reply('Coloque o ID: `!remover ID`');
+                return;
+            }
+            let schedules = loadSchedules();
+            const before = schedules.length;
+            schedules = schedules.filter(s => s.id !== id);
+            if (schedules.length === before) {
+                message.reply('ID não encontrado.');
+                return;
+            }
+            saveSchedules(schedules);
+            scheduleAll(client);
+            message.reply('Agenda removida: ' + id);
+            return;
+        }
+
+        // ---- !run ID (força envio)
+        if (content.startsWith('!run ')) {
+            const id = content.split(' ')[1];
+            if (!id) {
+                message.reply('Uso: !run ID');
+                return;
+            }
+            const schedules = loadSchedules();
+            const s = schedules.find(x => x.id === id);
+            if (!s) {
+                message.reply('ID não encontrado');
+                return;
+            }
+            try {
+                const channel = await client.channels.fetch(s.channelId).catch(() => null);
+                if (!channel) {
+                    message.reply('Canal não encontrado');
+                    return;
+                }
+                const roleMention = s.roleId ? `<@&${s.roleId}>` : '';
+                if (s.image) {
+                    const embed = new EmbedBuilder()
+                        .setColor(0x00aeff)
+                        .setTitle('⚔️ Boss Spawn Imminente!')
+                        .setDescription(s.message)
+                        .setImage(s.image)
+                        .setTimestamp();
+                    await channel.send({ content: roleMention, embeds: [embed] });
+                } else {
+                    await channel.send(`${roleMention} ${s.message}`);
+                }
+                message.reply('Mensagem enviada.');
+            } catch (err) {
+                console.error(err);
+                message.reply('Erro ao enviar, veja logs.');
+            }
+            return;
+        }
+
+        // ---- !debug
+        if (content === '!debug') {
+            const schedules = loadSchedules();
+            message.reply(`TIMEZONE=${TIMEZONE}\nSchedules carregados: ${schedules.length}`);
+            console.log('Schedules:', schedules);
+            return;
+        }
+    } catch (outerErr) {
+        console.error('Erro no handler messageCreate:', outerErr);
     }
 });
 
 // ===== Login =====
-client.login(process.env.DISCORD_TOKEN);
+client.login(process.env.DISCORD_TOKEN).catch(e => {
+    console.error('Erro ao logar cliente Discord:', e);
+});
