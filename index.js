@@ -269,9 +269,28 @@ client.on('messageCreate', async message => {
     } catch (outerErr) {
         console.error('Erro no handler messageCreate:', outerErr);
     }
+
+    // ---- !limpar
+if (content === '!limpar') {
+    let schedules = loadSchedules();
+    if (!schedules.length) {
+        message.reply('Nenhum alarme existente para apagar.');
+        return;
+    }
+
+    // limpar arquivo e parar as tarefas
+    saveSchedules([]);
+    clearScheduledTasks();
+
+    message.reply(`🧹 Todos os ${schedules.length} alarmes foram apagados com sucesso!`);
+    console.log('Todos os alarmes foram apagados manualmente.');
+    return;
+}
+
 });
 
 // ===== Login =====
 client.login(process.env.DISCORD_TOKEN).catch(e => {
     console.error('Erro ao logar cliente Discord:', e);
 });
+
