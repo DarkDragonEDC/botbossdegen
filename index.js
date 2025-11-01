@@ -40,7 +40,9 @@ function timeToCronExpression(time) {
 
 let scheduledTasks = [];
 function clearScheduledTasks() {
-    scheduledTasks.forEach(t => t.stop());
+    scheduledTasks.forEach(t => {
+        try { t.stop(); } catch (e) { /* ignore */ }
+    });
     scheduledTasks = [];
 }
 
@@ -62,33 +64,34 @@ function scheduleAll(client) {
                     console.log(`[CRON] Disparando ${s.time} -> ${s.message}`);
 
                     // envia com embed se tiver imagem
-                   // envia com embed se tiver imagem
-if (s.image) {
-    const embed = new EmbedBuilder()
-        .setColor(0x00aeff)
-        .setTitle('⚔️ Boss Spawn Imminente!')
-        .setDescription(s.message)
-        .setImage(s.image)
-        .setTimestamp();
+                    if (s.image) {
+                        const embed = new EmbedBuilder()
+                            .setColor(0x00aeff)
+                            .setTitle('⚔️ Boss Spawn Imminente!')
+                            .setDescription(s.message)
+                            .setImage(s.image)
+                            .setTimestamp();
 
-    await channel.send({ content: roleMention, embeds: [embed] });
-} else {
-    await channel.send(`${roleMention} ${s.message}`);
-}
+                        await channel.send({ content: roleMention, embeds: [embed] });
+                    } else {
+                        await channel.send(`${roleMention} ${s.message}`);
+                    }
 
-// Após executar, remover este agendamento para que ocorra apenas uma vez
-try {
-    let schedulesList = loadSchedules();
-    schedulesList = schedulesList.filter(x => x.id !== s.id);
-    saveSchedules(schedulesList);
-    // interrompe a tarefa cron para evitar futuras execuções
-    try { task.stop(); } catch (e) {}
-    console.log(`Agendamento ${s.id} removido após execução.`);
-} catch (err2) {
-    console.error('Erro ao remover agendamento após execução:', err2);
-}
+                    // Após executar, remover este agendamento para que ocorra apenas uma vez
+                    try {
+                        let schedulesList = loadSchedules();
+                        schedulesList = schedulesList.filter(x => x.id !== s.id);
+                        saveSchedules(schedulesList);
+                        // interrompe a tarefa cron para evitar futuras execuções
+                        try { task.stop(); } catch (e) { console.error('Erro ao parar task:', e); }
+                        console.log(`Agendamento ${s.id} removido após execução.`);
+                    } catch (err2) {
+                        console.error('Erro ao remover agendamento após execução:', err2);
+                    }
 
-                    console.error('Erro ao enviar mensagem:', err);
+                } catch (err) {
+                    // Catch principal do callback do cron
+                    console.error('Erro ao enviar mensagem (cron):', err);
                 }
             },
             { timezone: TIMEZONE }
@@ -136,7 +139,11 @@ client.on('messageCreate', async message => {
         // tenta carregar boss
         let bosses = [];
         if (fs.existsSync(BOSSES_FILE)) {
-            bosses = JSON.parse(fs.readFileSync(BOSSES_FILE, 'utf8'));
+            try {
+                bosses = JSON.parse(fs.readFileSync(BOSSES_FILE, 'utf8'));
+            } catch (e) {
+                bosses = [];
+            }
         }
         const boss = bosses.find(b => b.nome.toLowerCase() === bossKey);
 
@@ -252,4 +259,3 @@ client.on('messageCreate', async message => {
 
 // ===== Login =====
 client.login(process.env.DISCORD_TOKEN);
-
