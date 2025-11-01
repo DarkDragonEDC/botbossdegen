@@ -23,7 +23,8 @@ function loadSchedules() {
     if (!fs.existsSync(SCHEDULE_FILE)) fs.writeFileSync(SCHEDULE_FILE, '[]', 'utf8');
     try {
         return JSON.parse(fs.readFileSync(SCHEDULE_FILE, 'utf8'));
-    } catch {
+    } catch (e) {
+        console.error('Erro ao ler schedules.json:', e);
         return [];
     }
 }
@@ -40,10 +41,8 @@ function loadBosses() {
     if (!fs.existsSync(BOSSES_FILE)) return [];
     try {
         const raw = JSON.parse(fs.readFileSync(BOSSES_FILE, 'utf8'));
-        // normaliza cada boss para ter campos previsíveis
         return raw.map(b => ({
-            // tenta vários nomes de campo possíveis
-            key: (b.nome || b.name || b.key || '').toLowerCase(),
+            key: (b.nome || b.name || b.id || b.key || '').toString().toLowerCase(),
             titulo: b.titulo || b.title || b.nome || b.name || null,
             imagem: b.imagem || b.image || b.img || b.picture || null,
             id: b.id || null,
@@ -55,11 +54,10 @@ function loadBosses() {
     }
 }
 
-
 function timeToCronExpression(time) {
     const [hh, mm] = time.split(':').map(Number);
     if (isNaN(hh) || isNaN(mm)) return null;
-    // node-cron uses: second minute hour day month weekday
+    // node-cron: second minute hour day month weekday
     return `0 ${mm} ${hh} * * *`;
 }
 
@@ -88,13 +86,27 @@ function scheduleAll(client) {
 
                     console.log(`[CRON] Disparando ${s.time} -> ${s.message}`);
 
-                    // envia com embed se tiver imagem
-                    if (s.image) {
+                    // tenta garantir que temos imagem: se não tiver, tenta recarregar bosses.json pelo boss salvo
+                    let imageToUse = s.image || null;
+                    if (!imageToUse && s.boss) {
+                        try {
+                            const bossesNow = loadBosses();
+                            const b = bossesNow.find(x =>
+                                (x.titulo && x.titulo.toLowerCase() === (s.boss || '').toLowerCase()) ||
+                                x.key === (s.boss || '').toLowerCase()
+                            );
+                            if (b && b.imagem) imageToUse = b.imagem;
+                        } catch (e) {
+                            console.error('Erro ao tentar recarregar bosses para imagem:', e);
+                        }
+                    }
+
+                    if (imageToUse) {
                         const embed = new EmbedBuilder()
                             .setColor(0x00aeff)
                             .setTitle('⚔️ Boss Spawn Imminente!')
                             .setDescription(s.message)
-                            .setImage(s.image)
+                            .setImage(imageToUse)
                             .setTimestamp();
 
                         await channel.send({ content: roleMention, embeds: [embed] });
@@ -107,7 +119,6 @@ function scheduleAll(client) {
                         let schedulesList = loadSchedules();
                         schedulesList = schedulesList.filter(x => x.id !== s.id);
                         saveSchedules(schedulesList);
-                        // interrompe a tarefa cron para evitar futuras execuções
                         try { task.stop(); } catch (e) { console.error('Erro ao parar task:', e); }
                         console.log(`Agendamento ${s.id} removido após execução.`);
                     } catch (err2) {
@@ -161,18 +172,21 @@ client.on('messageCreate', async message => {
                 return;
             }
 
-            // tenta carregar boss
+            // tenta carregar boss (com normalização)
             let bosses = loadBosses();
-            const boss = bosses.find(b => (b.nome || '').toLowerCase() === bossKey);
+            const boss = bossKey ? bosses.find(b => b.key === bossKey.toLowerCase() || (b.id && b.id.toString().toLowerCase() === bossKey.toLowerCase())) : null;
 
             let msgText;
             let imageUrl = null;
+            let bossSaved = null;
 
             if (boss) {
-                msgText = `${extraText ? extraText + '\n' : ''}A preparação para o boss **${boss.titulo}** vai terminar em 10 minutos!`;
+                bossSaved = boss.titulo || boss.key;
+                msgText = `${extraText ? extraText + '\n' : ''}A preparação para o boss **${bossSaved}** vai terminar em 10 minutos!`;
                 imageUrl = boss.imagem || null;
             } else {
-                msgText = extraText || `Mensagem agendada (${bossKey})`;
+                bossSaved = bossKey || null;
+                msgText = extraText || `Mensagem agendada (${bossKey || 'sem boss'})`;
             }
 
             const schedules = loadSchedules();
@@ -182,7 +196,7 @@ client.on('messageCreate', async message => {
                 time,
                 channelId: channelMention,
                 roleId: roleMention,
-                boss: boss ? boss.titulo : bossKey, // salva o boss escolhido
+                boss: bossSaved,
                 message: msgText,
                 image: imageUrl
             });
@@ -230,6 +244,20 @@ client.on('messageCreate', async message => {
             return;
         }
 
+        // ---- !limpar (apaga todos os alarmes)
+        if (content === '!limpar') {
+            const schedules = loadSchedules();
+            if (!schedules.length) {
+                message.reply('Nenhum alarme existente para apagar.');
+                return;
+            }
+            saveSchedules([]);
+            clearScheduledTasks();
+            message.reply(`🧹 Todos os ${schedules.length} alarmes foram apagados com sucesso!`);
+            console.log('Todos os alarmes foram apagados manualmente.');
+            return;
+        }
+
         // ---- !run ID (força envio)
         if (content.startsWith('!run ')) {
             const id = content.split(' ')[1];
@@ -250,17 +278,34 @@ client.on('messageCreate', async message => {
                     return;
                 }
                 const roleMention = s.roleId ? `<@&${s.roleId}>` : '';
-                if (s.image) {
+
+                // tenta obter imagem dinamicamente caso não exista em s.image
+                let imageToUse = s.image || null;
+                if (!imageToUse && s.boss) {
+                    try {
+                        const bossesNow = loadBosses();
+                        const b = bossesNow.find(x =>
+                            (x.titulo && x.titulo.toLowerCase() === (s.boss || '').toLowerCase()) ||
+                            x.key === (s.boss || '').toLowerCase()
+                        );
+                        if (b && b.imagem) imageToUse = b.imagem;
+                    } catch (e) {
+                        console.error('Erro ao recarregar bosses para run:', e);
+                    }
+                }
+
+                if (imageToUse) {
                     const embed = new EmbedBuilder()
                         .setColor(0x00aeff)
                         .setTitle('⚔️ Boss Spawn Imminente!')
                         .setDescription(s.message)
-                        .setImage(s.image)
+                        .setImage(imageToUse)
                         .setTimestamp();
                     await channel.send({ content: roleMention, embeds: [embed] });
                 } else {
                     await channel.send(`${roleMention} ${s.message}`);
                 }
+
                 message.reply('Mensagem enviada.');
             } catch (err) {
                 console.error(err);
@@ -279,29 +324,9 @@ client.on('messageCreate', async message => {
     } catch (outerErr) {
         console.error('Erro no handler messageCreate:', outerErr);
     }
-
-    // ---- !limpar
-if (content === '!limpar') {
-    let schedules = loadSchedules();
-    if (!schedules.length) {
-        message.reply('Nenhum alarme existente para apagar.');
-        return;
-    }
-
-    // limpar arquivo e parar as tarefas
-    saveSchedules([]);
-    clearScheduledTasks();
-
-    message.reply(`🧹 Todos os ${schedules.length} alarmes foram apagados com sucesso!`);
-    console.log('Todos os alarmes foram apagados manualmente.');
-    return;
-}
-
 });
 
 // ===== Login =====
 client.login(process.env.DISCORD_TOKEN).catch(e => {
     console.error('Erro ao logar cliente Discord:', e);
 });
-
-
