@@ -62,19 +62,32 @@ function scheduleAll(client) {
                     console.log(`[CRON] Disparando ${s.time} -> ${s.message}`);
 
                     // envia com embed se tiver imagem
-                    if (s.image) {
-                        const embed = new EmbedBuilder()
-                            .setColor(0x00aeff)
-                            .setTitle('⚔️ Boss Spawn Imminente!')
-                            .setDescription(s.message)
-                            .setImage(s.image)
-                            .setTimestamp();
+                   // envia com embed se tiver imagem
+if (s.image) {
+    const embed = new EmbedBuilder()
+        .setColor(0x00aeff)
+        .setTitle('⚔️ Boss Spawn Imminente!')
+        .setDescription(s.message)
+        .setImage(s.image)
+        .setTimestamp();
 
-                        await channel.send({ content: roleMention, embeds: [embed] });
-                    } else {
-                        await channel.send(`${roleMention} ${s.message}`);
-                    }
-                } catch (err) {
+    await channel.send({ content: roleMention, embeds: [embed] });
+} else {
+    await channel.send(`${roleMention} ${s.message}`);
+}
+
+// Após executar, remover este agendamento para que ocorra apenas uma vez
+try {
+    let schedulesList = loadSchedules();
+    schedulesList = schedulesList.filter(x => x.id !== s.id);
+    saveSchedules(schedulesList);
+    // interrompe a tarefa cron para evitar futuras execuções
+    try { task.stop(); } catch (e) {}
+    console.log(`Agendamento ${s.id} removido após execução.`);
+} catch (err2) {
+    console.error('Erro ao remover agendamento após execução:', err2);
+}
+
                     console.error('Erro ao enviar mensagem:', err);
                 }
             },
@@ -112,7 +125,7 @@ client.on('messageCreate', async message => {
         const extraText = parts.slice(5).join(' ');
 
         if (!time || !channelMention || !roleMention || !bossKey) {
-            message.reply('Uso: `!agenda HH:MM #canal @role nome_do_boss [mensagem opcional]`');
+            message.reply('Uso: `!add HH:MM #canal @role nome_do_boss [mensagem opcional]`');
             return;
         }
         if (!/^\d{2}:\d{2}$/.test(time)) {
@@ -154,7 +167,7 @@ client.on('messageCreate', async message => {
     }
 
     // ---- !listaschedules
-    if (content === '!listaschedules') {
+    if (content === '!lista') {
         const schedules = loadSchedules();
         if (!schedules.length) {
             message.reply('Nenhuma agenda cadastrada.');
@@ -170,7 +183,7 @@ client.on('messageCreate', async message => {
     }
 
     // ---- !removeschedule ID
-    if (content.startsWith('!removeschedule ')) {
+    if (content.startsWith('!remover ')) {
         const id = content.split(' ')[1];
         if (!id) {
             message.reply('Coloque o ID: `!removeschedule ID`');
@@ -193,7 +206,7 @@ client.on('messageCreate', async message => {
     if (content.startsWith('!run ')) {
         const id = content.split(' ')[1];
         if (!id) {
-            message.reply('Uso: !run ID');
+            message.reply('Uso: !testar ID');
             return;
         }
         const schedules = loadSchedules();
@@ -229,7 +242,7 @@ client.on('messageCreate', async message => {
     }
 
     // ---- !debugschedules
-    if (content === '!debugschedules') {
+    if (content === '!debug') {
         const schedules = loadSchedules();
         message.reply(`TIMEZONE=${TIMEZONE}\nSchedules carregados: ${schedules.length}`);
         console.log('Schedules:', schedules);
@@ -239,3 +252,4 @@ client.on('messageCreate', async message => {
 
 // ===== Login =====
 client.login(process.env.DISCORD_TOKEN);
+
