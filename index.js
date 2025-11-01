@@ -156,53 +156,89 @@ client.on('messageCreate', async message => {
 
         // ---- !agenda HH:MM #canal @role nome_do_boss [mensagem opcional]
         if (content.startsWith('!agenda ')) {
-            const parts = content.split(' ');
+            const parts = content.split(/\s+/); // separa por espaços (1 ou mais)
             const time = parts[1];
-            const channelMention = (message.mentions.channels.first() || {}).id || parts[2];
-            const roleMention = (message.mentions.roles.first() || {}).id || parts[3];
-            const bossKey = parts[4] ? parts[4].toLowerCase() : null;
-            const extraText = parts.slice(5).join(' ');
 
-            if (!time || !channelMention || !roleMention || !bossKey) {
-                message.reply('Uso: `!agenda HH:MM #canal @role nome_do_boss [mensagem opcional]`');
-                return;
-            }
-            if (!/^\d{2}:\d{2}$/.test(time)) {
-                message.reply('Hora inválida. Use HH:MM');
-                return;
+            if (!time || !/^\d{2}:\d{2}$/.test(time)) {
+                return message.reply('Uso: `!agenda HH:MM #canal @role nome_do_boss [mensagem opcional]` (hora inválida)');
             }
 
-            // tenta carregar boss (com normalização)
-            let bosses = loadBosses();
-            const boss = bossKey ? bosses.find(b => b.key === bossKey.toLowerCase() || (b.id && b.id.toString().toLowerCase() === bossKey.toLowerCase())) : null;
+            // tenta extrair canal e role por mentions (preferência)
+            const mentionedChannel = message.mentions.channels.first();
+            const mentionedRole = message.mentions.roles.first();
+
+            // tentativa de obter ids a partir das partes (se não houver mention)
+            const possibleChannel = mentionedChannel ? mentionedChannel.id : (parts[2] && parts[2].replace(/[^0-9]/g, '')) || null;
+            const possibleRole = mentionedRole ? mentionedRole.id : (parts[3] && parts[3].replace(/[^0-9]/g, '')) || null;
+
+            // agora precisamos encontrar o bossKey: primeiro token que NÃO é menção/ID do canal nem role
+            let bossKey = null;
+            let bossIndex = -1;
+            for (let i = 2; i < parts.length; i++) {
+                const tok = parts[i];
+
+                // ignora tokens que sejam menções de canal (#<id> ou <#id>) ou menções de role (<@&id>) ou ids puros
+                if (/^<#[0-9]+>$/.test(tok) || /^#/.test(tok)) continue;
+                if (/^<@&[0-9]+>$/.test(tok) || /^@/.test(tok)) continue;
+                if (/^[0-9]{17,19}$/.test(tok)) {
+                    // pode ser um id puro — se for igual ao canal/role, pula
+                    if (tok === possibleChannel || tok === possibleRole) continue;
+                }
+                // Se chegou aqui, é o bossKey
+                bossKey = tok;
+                bossIndex = i;
+                break;
+            }
+
+            if (!bossKey) {
+                return message.reply('Não consegui encontrar o nome do boss. Uso: `!agenda HH:MM #canal @role nome_do_boss [mensagem opcional]`');
+            }
+
+            // o texto extra é tudo depois do bossIndex
+            const extraText = parts.slice(bossIndex + 1).join(' ');
+
+            // resolve canalId e roleId definitivos (prioriza mentions)
+            const channelId = mentionedChannel ? mentionedChannel.id : (possibleChannel || null);
+            const roleId = mentionedRole ? mentionedRole.id : (possibleRole || null);
+
+            if (!channelId || !roleId) {
+                return message.reply('Canal ou Role inválidos. Marque um canal e uma role ou use ids válidos.');
+            }
+
+            // carrega bosses normalizados
+            const bosses = loadBosses();
+            const boss = bosses.find(b =>
+                b.key === bossKey.toString().toLowerCase() ||
+                (b.id && b.id.toString().toLowerCase() === bossKey.toString().toLowerCase()) ||
+                (b.titulo && b.titulo.toString().toLowerCase() === bossKey.toString().toLowerCase())
+            );
 
             let msgText;
             let imageUrl = null;
-            let bossSaved = null;
+            const bossSaved = boss ? (boss.titulo || boss.key) : bossKey;
 
             if (boss) {
-                bossSaved = boss.titulo || boss.key;
                 msgText = `${extraText ? extraText + '\n' : ''}A preparação para o boss **${bossSaved}** vai terminar em 10 minutos!`;
                 imageUrl = boss.imagem || null;
             } else {
-                bossSaved = bossKey || null;
-                msgText = extraText || `Mensagem agendada (${bossKey || 'sem boss'})`;
+                msgText = extraText || `Mensagem agendada (${bossKey})`;
             }
 
+            // salva schedule
             const schedules = loadSchedules();
             const id = Date.now().toString();
             schedules.push({
                 id,
                 time,
-                channelId: channelMention,
-                roleId: roleMention,
+                channelId,
+                roleId,
                 boss: bossSaved,
                 message: msgText,
                 image: imageUrl
             });
             saveSchedules(schedules);
             scheduleAll(client);
-            message.reply(`Agenda criada: ${time} -> <#${channelMention}> <@&${roleMention}> (id: ${id})`);
+            message.reply(`Agenda criada: ${time} -> <#${channelId}> <@&${roleId}> (id: ${id})`);
             return;
         }
 
