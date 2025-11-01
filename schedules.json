@@ -1,0 +1,33 @@
+[
+  {
+    "id": "1761964518894",
+    "time": "23:37",
+    "channelId": "1433565901801656421",
+    "roleId": "1433594817291489291",
+    "message": "A preparação para o boss encerra em 10 minutos."
+  },
+  {
+    "id": "1761965327913",
+    "time": "23:50",
+    "channelId": "1433565901801656421",
+    "roleId": "1433594817291489291",
+    "message": "Nethros",
+    "image": null
+  },
+  {
+    "id": "1761965609684",
+    "time": "23:55",
+    "channelId": "1433565901801656421",
+    "roleId": "1433594817291489291",
+    "message": "Nethros",
+    "image": null
+  },
+  {
+    "id": "1761965958778",
+    "time": "00:01",
+    "channelId": "1433565901801656421",
+    "roleId": "<@338816718677737472>",
+    "message": "A preparação para o boss **Nethros Lvl 1** vai terminar em 10 minutos!",
+    "image": "https://cdn.degendungeon.com/Seasonal/Exorcism/nethros.png"
+  }
+]

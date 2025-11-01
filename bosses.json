@@ -1,0 +1,17 @@
+[
+  {
+    "nome": "nethros",
+    "titulo": "Nethros Lvl 1",
+    "imagem": "https://cdn.degendungeon.com/Seasonal/Exorcism/nethros.png"
+  },
+  {
+    "nome": "sirocco",
+    "titulo": "Sirocco Lvl 10",
+    "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/sirocco.png"
+  },
+  {
+    "nome": "grimroot",
+    "titulo": "Grimroot Lvl 1",
+    "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/grimroot.png"
+  }
+]
