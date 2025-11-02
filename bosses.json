@@ -5,13 +5,19 @@
     "imagem": "https://cdn.degendungeon.com/Seasonal/Exorcism/nethros.png"
   },
   {
+    "nome": "grimroot",
+    "titulo": "Grimroot Lvl 1",
+    "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/grimroot.png"
+  },
+  {
     "nome": "sirocco",
     "titulo": "Sirocco Lvl 10",
     "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/sirocco.png"
   },
   {
-    "nome": "grimroot",
-    "titulo": "Grimroot Lvl 1",
-    "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/grimroot.png"
+    "nome": "rimegard",
+    "titulo": "rimegard Lvl 20",
+    "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/rimegard.png"
   }
 ]
+
