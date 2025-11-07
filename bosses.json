@@ -16,8 +16,14 @@
   },
   {
     "nome": "rimegard",
-    "titulo": "rimegard Lvl 20",
+    "titulo": "Rimegard Lvl 20",
     "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/rimegard.png"
+  },
+  {
+    "nome": "abyssos",
+    "titulo": "Abyssos Lvl 40",
+    "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/abyssos.png"
   }
 ]
+
 
