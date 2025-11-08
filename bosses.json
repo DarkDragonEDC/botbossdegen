@@ -23,7 +23,13 @@
     "nome": "abyssos",
     "titulo": "Abyssos Lvl 40",
     "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/abyssos.png"
+  },
+  {
+    "nome": "infernus",
+    "titulo": "Infernus Lvl 30",
+    "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/infernus.png"
   }
 ]
+
 
 
