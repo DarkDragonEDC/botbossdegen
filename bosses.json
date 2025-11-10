@@ -20,16 +20,27 @@
     "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/rimegard.png"
   },
   {
+    "nome": "infernus",
+    "titulo": "Infernus Lvl 30",
+    "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/infernus.png"
+  },
+  {
     "nome": "abyssos",
     "titulo": "Abyssos Lvl 40",
     "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/abyssos.png"
   },
   {
-    "nome": "infernus",
-    "titulo": "Infernus Lvl 30",
-    "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/infernus.png"
+    "nome": "voidgrasp",
+    "titulo": "Voidgrasp Lvl 50",
+    "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/voidgrasp.png"
+  },
+  {
+    "nome": "thundermaw",
+    "titulo": "Thundermaw Lvl 80",
+    "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/thundermaw.png"
   }
 ]
+
 
 
 
