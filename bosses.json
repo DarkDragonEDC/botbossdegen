@@ -35,11 +35,17 @@
     "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/voidgrasp.png"
   },
   {
+    "nome": "blightmaw",
+    "titulo": "Blightmaw Lvl 60",
+    "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/blightmaw.png"
+  },
+  {
     "nome": "thundermaw",
     "titulo": "Thundermaw Lvl 80",
     "imagem": "https://cdn.degendungeon.com/Monsters/Worldboss/thundermaw.png"
   }
 ]
+
 
 
 
